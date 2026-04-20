@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Gorjeta dá Sorte — App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #05060d; font-family: Inter, system-ui; color: #fff; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  button { font-family: inherit; }
+  ::-webkit-scrollbar { display: none; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.15); } }
+  @keyframes float {
+    0%,100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+    50% { transform: translateY(-8px) rotate(var(--r, 0deg)); }
+  }
+  @keyframes confetti {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(900px) rotate(720deg); opacity: 0; }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Tweaks panel */
+  #tweaks-panel {
+    position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+    width: 280px; padding: 14px; border-radius: 18px;
+    background: rgba(15,27,61,0.96); border: 1px solid rgba(255,200,61,0.3);
+    backdrop-filter: blur(20px); color: #fff; font-size: 13px;
+    display: none;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  #tweaks-panel.on { display: block; }
+  #tweaks-panel h4 { margin: 0 0 10px; font-family: "Archivo Black"; font-size: 14px; color: #FFC83D; letter-spacing: 0.5px; font-style: italic; }
+  #tweaks-panel label { display: block; margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  #tweaks-panel .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  #tweaks-panel button {
+    flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  #tweaks-panel button.active { background: rgba(255,200,61,0.18); border-color: #FFC83D; color: #FFC83D; }
+  #tweaks-panel input[type=range] { width: 100%; accent-color: #FFC83D; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <div id="tweaks-panel">
+    <h4>✦ Tweaks</h4>
+    <label>Tela inicial</label>
+    <div class="row" id="tw-screen">
+      <button data-v="login">Login</button>
+      <button data-v="home">Home</button>
+      <button data-v="detail">Sorteio</button>
+      <button data-v="wheel">Roleta</button>
+      <button data-v="result">Prêmio</button>
+      <button data-v="wallet">Carteira</button>
+      <button data-v="profile">Perfil</button>
+    </div>
+    <label>Hue dourado</label>
+    <input type="range" id="tw-hue" min="20" max="90" step="1"/>
+    <label>Estilo logo</label>
+    <div class="row" id="tw-logo">
+      <button data-v="monogram">Moeda GS</button>
+      <button data-v="type">Só tipo</button>
+    </div>
+    <label>Densidade home</label>
+    <div class="row" id="tw-density">
+      <button data-v="relaxed">Relax</button>
+      <button data-v="compact">Compacto</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="app-shell.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="screens2.jsx"></script>
+
+  <script type="text/babel">
+    const TWEAKS = /*EDITMODE-BEGIN*/{
+      "initialScreen": "result",
+      "goldHue": 45,
+      "logoStyle": "type",
+      "density": "compact"
+    }/*EDITMODE-END*/;
+
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [screen, setScreen] = useState(() => {
+        const saved = localStorage.getItem('gs-screen');
+        return saved || TWEAKS.initialScreen;
+      });
+      const [tab, setTab] = useState('home');
+      const [hue, setHue] = useState(TWEAKS.goldHue);
+      const [prize, setPrize] = useState(null);
+      const [countdown, setCountdown] = useState(134);
+
+      useEffect(() => { localStorage.setItem('gs-screen', screen); }, [screen]);
+
+      useEffect(() => {
+        const t = setInterval(() => setCountdown(c => c > 0 ? c - 1 : 300), 1000);
+        return () => clearInterval(t);
+      }, []);
+
+      const user = { name: 'Ana Carolina', initials: 'AC', tickets: 14 };
+
+      const nextDraw = `00:${String(Math.floor(countdown / 60)).padStart(2, '0')}:${String(countdown % 60).padStart(2, '0')}`;
+
+      // apply gold hue globally by overriding CSS vars — simple approach: transform rgb
+      useEffect(() => {
+        document.documentElement.style.setProperty('--gold-hue', hue);
+      }, [hue]);
+
+      // TWEAKS wiring
+      useEffect(() => {
+        const listener = (e) => {
+          if (e.data?.type === '__activate_edit_mode') {
+            document.getElementById('tweaks-panel').classList.add('on');
+          } else if (e.data?.type === '__deactivate_edit_mode') {
+            document.getElementById('tweaks-panel').classList.remove('on');
+          }
+        };
+        window.addEventListener('message', listener);
+        window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+        // Wire controls
+        const screenBtns = document.querySelectorAll('#tw-screen button');
+        screenBtns.forEach(b => {
+          b.classList.toggle('active', b.dataset.v === screen);
+          b.onclick = () => {
+            const v = b.dataset.v;
+            const map = { login: 'login', home: 'home', detail: 'detail', wheel: 'wheel', result: 'result', wallet: 'wallet', profile: 'profile' };
+            if (v === 'result') setPrize({ prize: 100, label: 'R$ 100' });
+            setScreen(map[v]);
+            if (v === 'wallet') setTab('wallet');
+            if (v === 'profile') setTab('profile');
+            if (v === 'home') setTab('home');
+            window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { initialScreen: map[v] } }, '*');
+          };
+        });
+        const hueEl = document.getElementById('tw-hue');
+        hueEl.value = hue;
+        hueEl.oninput = (e) => {
+          const v = Number(e.target.value);
+          setHue(v);
+          window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { goldHue: v } }, '*');
+        };
+        const logoBtns = document.querySelectorAll('#tw-logo button');
+        logoBtns.forEach(b => {
+          b.onclick = () => {
+            window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { logoStyle: b.dataset.v } }, '*');
+          };
+        });
+        const densBtns = document.querySelectorAll('#tw-density button');
+        densBtns.forEach(b => {
+          b.onclick = () => {
+            window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { density: b.dataset.v } }, '*');
+          };
+        });
+
+        return () => window.removeEventListener('message', listener);
+      }, [screen, hue]);
+
+      let view;
+      if (screen === 'login') {
+        view = <LoginScreen onLogin={() => setScreen('home')}/>;
+      } else if (screen === 'detail') {
+        view = <RaffleDetail onBack={() => setScreen('home')} onSpin={() => setScreen('wheel')}/>;
+      } else if (screen === 'wheel') {
+        view = <WheelScreen onBack={() => setScreen('detail')} onComplete={(p) => { setPrize(p); setScreen('result'); }}/>;
+      } else if (screen === 'result') {
+        view = <ResultScreen prize={prize || { prize: 100 }} onContinue={() => { setScreen('home'); setTab('wallet'); }}/>;
+      } else if (screen === 'home' || screen === 'wallet' || screen === 'profile') {
+        const current = screen;
+        const activeTab = current === 'home' ? tab : current;
+        const setActiveTab = (t) => {
+          setTab(t);
+          if (t === 'home') setScreen('home');
+          else if (t === 'wallet') setScreen('wallet');
+          else if (t === 'profile') setScreen('profile');
+          else if (t === 'raffles') setScreen('detail');
+        };
+        let inner;
+        if (activeTab === 'home') inner = <HomeScreen user={user} nextDrawIn={nextDraw} onOpenRaffle={() => setScreen('detail')}/>;
+        else if (activeTab === 'wallet') inner = <WalletScreen/>;
+        else if (activeTab === 'profile') inner = <ProfileScreen user={user}/>;
+
+        view = <>{inner}<BottomNav tab={activeTab} onTab={setActiveTab}/></>;
+      } else {
+        view = <LoginScreen onLogin={() => setScreen('home')}/>;
+      }
+
+      // hue transform: gold is #FFC83D. We just let user imagine subtle hue shifts.
+      const filterStyle = hue === 48 ? {} : { filter: `hue-rotate(${hue - 48}deg)` };
+
+      return (
+        <div style={{
+          minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px', background: 'radial-gradient(ellipse at top, #0F1B3D 0%, #05060d 60%)',
+        }}>
+          <div style={filterStyle}>
+            <IOSDevice dark width={402} height={820}>
+              <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#050B1C' }}>
+                <div style={{ width: '100%', height: '100%', overflowY: 'auto' }}>
+                  {view}
+                </div>
+              </div>
+            </IOSDevice>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
